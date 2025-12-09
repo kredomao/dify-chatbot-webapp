@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from './lib/supabase';
 import { callDifyAPI } from './lib/dify-api';
 import { Message } from './types/message';
 import ChatMessage from './components/ChatMessage';
@@ -25,25 +24,9 @@ function App() {
   }, [messages]);
 
   useEffect(() => {
-    fetchMessages();
+    // 初期化時にローディングを終了
+    setLoading(false);
   }, []);
-
-  const fetchMessages = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      setMessages(data || []);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getBotResponse = async (userMessage: string): Promise<string> => {
     try {
@@ -65,27 +48,37 @@ function App() {
     setSending(true);
 
     try {
-      const { error: userError } = await supabase
-        .from('messages')
-        .insert([{ content, is_bot: false }]);
-
-      if (userError) throw userError;
-
-      await fetchMessages();
+      // ユーザーメッセージを追加
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        content: content,
+        is_bot: false,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, userMessage]);
 
       // Dify APIを呼び出してボット応答を取得
       const botResponse = await getBotResponse(content);
 
-      const { error: botError } = await supabase
-        .from('messages')
-        .insert([{ content: botResponse, is_bot: true }]);
-
-      if (botError) throw botError;
-
-      await fetchMessages();
+      // ボットメッセージを追加
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: botResponse,
+        is_bot: true,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      
       setSending(false);
     } catch (error) {
       console.error('Error sending message:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: `エラーが発生しました: ${error instanceof Error ? error.message : '不明なエラー'}`,
+        is_bot: true,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
       setSending(false);
     }
   };
