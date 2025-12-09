@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './lib/supabase';
+import { callDifyAPI } from './lib/dify-api';
 import { Message } from './types/message';
 import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
@@ -9,7 +10,11 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [conversationId, setConversationId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // ユーザーID（実際の実装では認証から取得）
+  const userId = `web-user-${Date.now()}`;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -40,40 +45,20 @@ function App() {
     }
   };
 
-  const getBotResponse = (userMessage: string): string => {
-    const lowerMessage = userMessage.toLowerCase();
-
-    if (lowerMessage.includes('こんにちは') || lowerMessage.includes('はじめまして')) {
-      return 'こんにちは！何かお手伝いできることはありますか？';
+  const getBotResponse = async (userMessage: string): Promise<string> => {
+    try {
+      const response = await callDifyAPI(userMessage, userId, conversationId);
+      
+      // 会話IDを保存（次回の会話継続用）
+      if (response.conversation_id) {
+        setConversationId(response.conversation_id);
+      }
+      
+      return response.answer;
+    } catch (error: any) {
+      console.error('Dify API error:', error);
+      return `エラーが発生しました: ${error.message || '不明なエラー'}`;
     }
-    if (lowerMessage.includes('ありがとう')) {
-      return 'どういたしまして！他に何かお手伝いできることはありますか？';
-    }
-    if (lowerMessage.includes('天気')) {
-      return '申し訳ありませんが、リアルタイムの天気情報は取得できません。天気予報サイトをご確認ください。';
-    }
-    if (lowerMessage.includes('時間')) {
-      return `現在の時刻は ${new Date().toLocaleTimeString('ja-JP')} です。`;
-    }
-    if (lowerMessage.includes('名前')) {
-      return '私はチャットボットです。お手伝いできることがあれば教えてください！';
-    }
-    if (lowerMessage.includes('できる') || lowerMessage.includes('機能')) {
-      return 'メッセージのやり取りができます。質問や会話をお気軽にどうぞ！';
-    }
-    if (lowerMessage.includes('さようなら') || lowerMessage.includes('バイバイ')) {
-      return 'さようなら！またお話ししましょう！';
-    }
-
-    const responses = [
-      'なるほど、興味深いですね！もっと詳しく教えてください。',
-      'それについて詳しく聞かせてください。',
-      '面白い視点ですね。他にも何かありますか？',
-      'そうなんですね！それについてもっと知りたいです。',
-      'ご質問ありがとうございます。どのようにお手伝いできますか？',
-    ];
-
-    return responses[Math.floor(Math.random() * responses.length)];
   };
 
   const handleSendMessage = async (content: string) => {
@@ -88,18 +73,17 @@ function App() {
 
       await fetchMessages();
 
-      setTimeout(async () => {
-        const botResponse = getBotResponse(content);
+      // Dify APIを呼び出してボット応答を取得
+      const botResponse = await getBotResponse(content);
 
-        const { error: botError } = await supabase
-          .from('messages')
-          .insert([{ content: botResponse, is_bot: true }]);
+      const { error: botError } = await supabase
+        .from('messages')
+        .insert([{ content: botResponse, is_bot: true }]);
 
-        if (botError) throw botError;
+      if (botError) throw botError;
 
-        await fetchMessages();
-        setSending(false);
-      }, 1000);
+      await fetchMessages();
+      setSending(false);
     } catch (error) {
       console.error('Error sending message:', error);
       setSending(false);
