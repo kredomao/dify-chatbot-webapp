@@ -12,8 +12,8 @@ function App() {
   const [conversationId, setConversationId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // ユーザーID（実際の実装では認証から取得）
-  const userId = `web-user-${Date.now()}`;
+  // ユーザーID（実際の実装では認証から取得）- 固定値にする
+  const [userId] = useState(() => `web-user-${Date.now()}`);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -28,19 +28,17 @@ function App() {
     setLoading(false);
   }, []);
 
-  const getBotResponse = async (userMessage: string): Promise<string> => {
+  const getBotResponse = async (userMessage: string, currentConversationId: string): Promise<{ answer: string; conversationId: string }> => {
     try {
-      const response = await callDifyAPI(userMessage, userId, conversationId);
+      const response = await callDifyAPI(userMessage, userId, currentConversationId);
       
-      // 会話IDを保存（次回の会話継続用）
-      if (response.conversation_id) {
-        setConversationId(response.conversation_id);
-      }
-      
-      return response.answer;
+      return {
+        answer: response.answer,
+        conversationId: response.conversation_id || currentConversationId,
+      };
     } catch (error: any) {
       console.error('Dify API error:', error);
-      return `エラーが発生しました: ${error.message || '不明なエラー'}`;
+      throw error; // エラーを再スローして、handleSendMessageで処理
     }
   };
 
@@ -58,12 +56,17 @@ function App() {
       setMessages((prev) => [...prev, userMessage]);
 
       // Dify APIを呼び出してボット応答を取得
-      const botResponse = await getBotResponse(content);
+      const response = await getBotResponse(content, conversationId);
+      
+      // 会話IDを更新（次回の会話継続用）
+      if (response.conversationId) {
+        setConversationId(response.conversationId);
+      }
 
       // ボットメッセージを追加
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: botResponse,
+        content: response.answer,
         is_bot: true,
         created_at: new Date().toISOString(),
       };

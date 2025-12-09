@@ -28,7 +28,8 @@ export async function callDifyAPI(
     inputs: {},
     query: message,
     response_mode: 'blocking',
-    conversation_id: conversationId || '',
+    // 会話IDが空文字列の場合は送信しない（新規会話）
+    ...(conversationId ? { conversation_id: conversationId } : {}),
     user: userId,
   };
 
@@ -43,8 +44,9 @@ export async function callDifyAPI(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData.message || errorData.error || response.statusText;
     throw new Error(
-      `Dify API error: ${response.status} ${response.statusText}. ${errorData.message || ''}`
+      `Dify API error: ${response.status} ${errorMessage}`
     );
   }
 
