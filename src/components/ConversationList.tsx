@@ -1,10 +1,13 @@
 import { ConversationSummary } from '../lib/supabase';
+import QuickActions from './QuickActions';
+import { Plus } from 'lucide-react';
 
 interface ConversationListProps {
   conversations: ConversationSummary[];
   currentConversationId: string | null;
   onSelectConversation: (conversationId: string | null) => void;
   onNewConversation: () => void;
+  onQuickAction: (message: string) => void;
 }
 
 export default function ConversationList({
@@ -12,18 +15,28 @@ export default function ConversationList({
   currentConversationId,
   onSelectConversation,
   onNewConversation,
+  onQuickAction,
 }: ConversationListProps) {
   return (
-    <aside className="w-64 border-r border-gray-200 bg-white/80 backdrop-blur-sm flex flex-col">
+    <aside className="w-64 border-r border-gray-200 bg-white/80 backdrop-blur-sm flex flex-col h-screen">
       <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-700">会話一覧</h2>
+        <h2 className="text-sm font-semibold text-gray-700">メニュー</h2>
         <button
           type="button"
           onClick={onNewConversation}
-          className="text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+          className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
         >
-          新しい会話
+          <Plus className="w-3 h-3" />
+          新規
         </button>
+      </div>
+
+      <QuickActions onSelectAction={onQuickAction} />
+
+      <div className="px-4 py-3">
+        <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+          会話履歴
+        </h3>
       </div>
       <div className="flex-1 overflow-y-auto">
         {conversations.length === 0 ? (
